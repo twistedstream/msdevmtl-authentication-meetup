@@ -1,0 +1,98 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <script src="http://code.jquery.com/jquery-2.1.1.min.js"></script>
+
+    <script src="//use.typekit.net/iws6ohy.js"></script>
+    <script>try{Typekit.load();}catch(e){}</script>
+
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <!-- font awesome from BootstrapCDN -->
+    <link href="//maxcdn.bootstrapcdn.com/bootstrap/3.2.0/css/bootstrap.min.css" rel="stylesheet">
+    <link href="//maxcdn.bootstrapcdn.com/font-awesome/4.1.0/css/font-awesome.min.css" rel="stylesheet">
+
+    <script src="auth0-variables.js"> </script>
+    <link href="app.css" rel="stylesheet">
+  </head>
+  <body class="home">
+    <div class="container">
+      <div class="login-page clearfix">
+        <div class="login-box auth0-box before">
+          <img class="logo" src="https://i.cloudup.com/StzWWrY34s.png" />
+          <h3>Auth0 Passwordless Example</h3>
+          <p>Login with a Magic Link sent to your email</p>
+          <div class="alert alert-warning">Don't forget to add your page's URL <strong><script type="text/javascript">document.write(location.href)</script></strong> to your App's <strong>Allowed Callback URLs</strong> list in the <a target="_blank" href="https://manage.auth0.com">Auth0 dashboard</a></div>
+          <div class="enter-phone">
+            <label>Enter your email:</label>
+            <input class="email"/>
+            <br><br>
+            <button onclick="sendMagicLink()" class="btn btn-primary">Send Magic Link</button>
+            <br><br>
+            <span class="alert alert-success email-sent" style="display: none;">
+              An email was sent with the link!
+            </span>
+          </div>
+        </div>
+        <div class="logged-in-box auth0-box logged-in" style="display: none;">
+          <h1 id="logo"><img src="auth0_logo_final_blue_RGB.png" /></h1>
+          <img class="avatar"/>
+          <h2>Welcome <span class="nickname"></span></h2>
+        </div>
+      </div>
+    </div>
+
+    <script src="https://cdn.auth0.com/w2/auth0-6.7.min.js"></script>
+    <script type="text/javascript">
+      
+      // Initialize Auth0 Client instance
+      var auth0 = new Auth0({
+        // All these properties are set in auth0-variables.js
+        clientID: AUTH0_CLIENT_ID,
+        domain: AUTH0_DOMAIN
+      });
+
+      function sendMagicLink(){
+        var email = $('input.email').val();
+        auth0.requestMagicLink({ email: email }, function(err) {
+          if (err) {
+            alert('error sending e-mail: ' + err.error_description);
+            return;
+          }
+          // the request was successful and you should 
+          // receive the passcode to the specified phone
+          $('.enter-email').hide();
+          $('.email-sent').show();
+        });
+      }
+
+      $(document).ready(function() {
+        var hash = auth0.parseHash(window.location.hash);
+
+        if (hash && hash.error) {
+          alert('There was an error: ' + hash.error + '\n' + hash.error_description);
+        }
+        else if (hash && hash.id_token) {
+          //save the token in local storage:
+          localStorage.setItem('id_token', hash.id_token);
+          console.log('hash',hash);
+          $('.login-box').hide();
+          $('.logged-in-box').show();
+          //retrieve profile
+          auth0.getProfile(hash.id_token, function (err, profile) {
+            if (err){
+              console.log('err',err);
+              alert(`There was an error retrieving your profile: ${err.message}`);
+            } else {
+              localStorage.setItem('profile', profile);
+              $('.nickname').text(profile.name);
+              $('.avatar').attr('src', profile.picture);
+            }
+          });
+        }
+      });
+
+    </script>
+  </body>
+</html>

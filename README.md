@@ -6,3 +6,5 @@
 
 * Demo 1: [JWTs](demo1_jwts)
 * Demo 2: [Federated authentication with ASP.NET Core](demo2_federated-authn)
+* Demo 3: [Passwordless](demo3_passwordless
+)

@@ -8,3 +8,4 @@
 * Demo 2: [Federated authentication with ASP.NET Core](demo2_federated-authn)
 * Demo 3: [Passwordless](demo3_passwordless)
 * Demo 4: [Simple OAuth2](demo4_simple-oauth2)
+* Demo 5: [OAuth2 using Auth0](demo5_oauth2-using-auth0)

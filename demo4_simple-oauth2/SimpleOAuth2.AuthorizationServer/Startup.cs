@@ -52,6 +52,10 @@ namespace SimpleOAuth2.AuthorizationServer
             // Add application services.
             services.AddTransient<IEmailSender, AuthMessageSender>();
             services.AddTransient<ISmsSender, AuthMessageSender>();
+
+            // OAuth2 configuration
+            services.AddOptions();
+            services.Configure<OAuth2Configuration>(Configuration.GetSection("OAuth2"));
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.

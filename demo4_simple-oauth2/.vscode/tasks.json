@@ -1,16 +1,28 @@
 {
     "version": "0.1.0",
-    "command": "dotnet",
-    "isShellCommand": true,
-    "args": [],
     "tasks": [
         {
-            "taskName": "build",
+            "taskName": "build_SimpleOAuth2.ResourceServer",
+            "command": "dotnet",
+            "isShellCommand": true,
             "args": [
+                "build",
                 "${workspaceRoot}/SimpleOAuth2.ResourceServer/SimpleOAuth2.ResourceServer.csproj"
             ],
             "isBuildCommand": true,
             "problemMatcher": "$msCompile"
-        }
+        },
+
+        {
+            "taskName": "build_SimpleOAuth2.AuthorizationServer",
+            "command": "dotnet",
+            "isShellCommand": true,
+            "args": [
+                "build",
+                "${workspaceRoot}/SimpleOAuth2.AuthorizationServer/SimpleOAuth2.AuthorizationServer.csproj"
+            ],
+            "isBuildCommand": true,
+            "problemMatcher": "$msCompile"
+        }        
     ]
 }

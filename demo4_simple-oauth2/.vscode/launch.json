@@ -2,10 +2,10 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": ".NET Core Launch (web)",
+            "name": "Resource Server",
             "type": "coreclr",
             "request": "launch",
-            "preLaunchTask": "build",
+            "preLaunchTask": "build_SimpleOAuth2.ResourceServer",
             "program": "${workspaceRoot}/SimpleOAuth2.ResourceServer/bin/Debug/netcoreapp1.1/SimpleOAuth2.ResourceServer.dll",
             "args": [],
             "cwd": "${workspaceRoot}/SimpleOAuth2.ResourceServer",
@@ -27,6 +27,38 @@
             },
             "env": {
                 "ASPNETCORE_ENVIRONMENT": "Development"
+            },
+            "sourceFileMap": {
+                "/Views": "${workspaceRoot}/Views"
+            }
+        },
+        {
+            "name": "Authorization Server",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "build_SimpleOAuth2.AuthorizationServer",
+            "program": "${workspaceRoot}/SimpleOAuth2.AuthorizationServer/bin/Debug/netcoreapp1.1/SimpleOAuth2.AuthorizationServer.dll",
+            "args": [],
+            "cwd": "${workspaceRoot}/SimpleOAuth2.AuthorizationServer",
+            "stopAtEntry": false,
+            "internalConsoleOptions": "openOnSessionStart",
+            "launchBrowser": {
+                "enabled": true,
+                "args": "${auto-detect-url}",
+                "windows": {
+                    "command": "cmd.exe",
+                    "args": "/C start ${auto-detect-url}"
+                },
+                "osx": {
+                    "command": "open"
+                },
+                "linux": {
+                    "command": "xdg-open"
+                }
+            },
+            "env": {
+                "ASPNETCORE_ENVIRONMENT": "Development",
+                "ASPNETCORE_URLS": "http://*:5001"
             },
             "sourceFileMap": {
                 "/Views": "${workspaceRoot}/Views"

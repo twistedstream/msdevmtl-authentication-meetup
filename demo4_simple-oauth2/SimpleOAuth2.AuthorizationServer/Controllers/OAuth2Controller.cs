@@ -14,6 +14,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.IdentityModel.Tokens;
 using SimpleOAuth2.AuthorizationServer.Data;
 using SimpleOAuth2.AuthorizationServer.Models;
+using SimpleOAuth2.AuthorizationServer.Models.OAuth2ViewModels;
 
 namespace SimpleOAuth2.AuthorizationServer.Controllers
 {
@@ -32,6 +33,71 @@ namespace SimpleOAuth2.AuthorizationServer.Controllers
             _oauth2Clients = _oauth2Configuration.Clients.ToDictionary(c => c.ClientId);
         }
 
+        private async Task<OAuth2Grant> GetExistingGrant(string clientId, string userId)
+        {
+            var existingGrant = await _dbContext.Grants
+                .SingleOrDefaultAsync(g => g.ClientId == clientId && g.UserId == userId);
+            
+            return existingGrant;
+        }
+
+        private async Task UpstertGrantRecord(OAuth2Grant existingGrant, string grantedScopes, string clientId, string userId)
+        {
+            var grant = existingGrant == null ? new OAuth2Grant() : existingGrant;
+            grant.Scope = grantedScopes;
+            if (existingGrant == null)
+            {
+                grant.ClientId = clientId;
+                grant.UserId = userId;
+
+                _dbContext.Add(grant);
+            }
+            await _dbContext.SaveChangesAsync();
+        }
+
+        private async Task<ActionResult> CreateAuthorizationCodeAndRedirect (string clientId, string userId, string redirectUri, string state)
+        {
+            // create authorization code
+            var authorizationCode = new OAuth2AuthorizationCode
+            {
+                Code = Guid.NewGuid().ToString("N"),
+                ClientId = clientId,
+                UserId = userId,
+                RedirectUri = redirectUri
+            };
+            _dbContext.Add(authorizationCode);
+            await _dbContext.SaveChangesAsync();
+
+            // generate final redirect URL
+            var queryParams = new Dictionary<string, string>
+            {
+                { "code", authorizationCode.Code }
+            };
+            if (!string.IsNullOrEmpty(state))
+            {
+                queryParams.Add("state", state);
+            }
+
+            var finalRedirectUrl = QueryHelpers.AddQueryString(redirectUri, queryParams);
+            return Redirect(finalRedirectUrl);            
+        }
+
+        private RedirectResult OAuth2AuthorizationError(string redirectUrl, string state, string error, string errorDescription)
+        {
+            var query = new Dictionary<string, string>
+            {
+                { "error", error },
+                { "error_description", errorDescription }
+            };
+            if (!string.IsNullOrEmpty(state))
+            {
+                query["state"] = state;
+            }
+            var finalUrl = QueryHelpers.AddQueryString(redirectUrl, query);
+
+            return Redirect(finalUrl);
+        }
+
         private JsonResult OAuth2TokenError(string error, string errorDescription)
         {
             Response.StatusCode = 400;
@@ -41,7 +107,7 @@ namespace SimpleOAuth2.AuthorizationServer.Controllers
                 error_description = errorDescription
             });
         }
-
+        
         [HttpGet]
         [Authorize]
         public async Task<ActionResult> Authorize()
@@ -92,55 +158,104 @@ namespace SimpleOAuth2.AuthorizationServer.Controllers
             // state
             var state = Request.Query["state"];
 
-            // scope
+            // get requested scopes
             var scope = Request.Query["scope"];
             var requestedScopes = string.IsNullOrEmpty(scope) ? new string[] {} : ((string) scope).Split(' ');
 
-            // create or update the associate grant record
-            var grantedScopes = requestedScopes
-                .Where(s => _oauth2Configuration.AllowedScopes.Any(ss => ss == s));
+            // calculate possible granted scopes
+            var grantedScopes = string.Join(" ",
+                _oauth2Configuration.AllowedScopes
+                    .Where(s => requestedScopes.Any(ss => ss == s)));
 
-            var user = await _userManager.GetUserAsync(User);
+            // fetch current user ID
+            var userId = (await _userManager.GetUserAsync(User)).Id;
 
-            var existingGrant = await _dbContext.Grants
-                .SingleOrDefaultAsync(g => g.ClientId == clientId.ToString() && g.UserId == user.Id);
+            // fetch existing grant (if any)
+            var existingGrant = await GetExistingGrant(clientId, userId);
 
-            var grant = existingGrant == null ? new OAuth2Grant() : existingGrant;
-            grant.Scope = string.Join(" ", grantedScopes);
-            if (existingGrant == null)
+            // check to see if the existing grant has the same scopes
+            if (existingGrant != null && existingGrant.Scope == grantedScopes) 
             {
-                grant.ClientId = clientId;
-                grant.UserId = user.Id;
-
-                _dbContext.Add(grant);
+                // no change in grant
+                return await CreateAuthorizationCodeAndRedirect(clientId, userId, redirectUri, state);
             }
-            await _dbContext.SaveChangesAsync();
+            else if (client.IsFirstParty)
+            {
+                // update grant without consent since its a first party app
+                await UpstertGrantRecord(existingGrant, grantedScopes, clientId, userId);
 
-            // create authorization code
-            var authorizationCode = new OAuth2AuthorizationCode
-            {
-                Code = Guid.NewGuid().ToString("N"),
-                ClientId = clientId,
-                UserId = user.Id,
-                RedirectUri = redirectUri
-            };
-            _dbContext.Add(authorizationCode);
-            await _dbContext.SaveChangesAsync();
-
-            // generate final redirect URL
-            var queryParams = new Dictionary<string, string>
-            {
-                { "code", authorizationCode.Code }
-            };
-            if (!string.IsNullOrEmpty(state))
-            {
-                queryParams.Add("state", state);
+                return await CreateAuthorizationCodeAndRedirect(clientId, userId, redirectUri, state);
             }
+            else 
+            {
+                // third party app: redirect to consent page so user can grant access
+                TempData["ClientName"] = client.ClientName;
+                TempData["ClientId"] = clientId.ToString();
+                TempData["GrantedScopes"] = grantedScopes;
+                TempData["RedirectUri"] = redirectUri.ToString();
+                TempData["State"] = state.ToString();
 
-            var finalRedirectUrl = QueryHelpers.AddQueryString(redirectUri, queryParams);
-            return Redirect(finalRedirectUrl);
+                return RedirectToAction("Consent");
+            }
         }
 
+        [HttpGet]
+        [Authorize]
+        public async Task<ActionResult> Consent()
+        {
+            // rehydrate and validate TempData passed from the authorize request
+            var viewModel = new ConsentViewModel
+            {
+                ClientName = (string) TempData["ClientName"],
+                ClientId = (string) TempData["ClientId"],
+                GrantedScopes = (string) TempData["GrantedScopes"],
+                RedirectUri = (string) TempData["RedirectUri"],
+                // state can be empty
+                State = (string) TempData["State"]
+            };
+            if (string.IsNullOrEmpty(viewModel.ClientName) || 
+                string.IsNullOrEmpty(viewModel.ClientId) || 
+                string.IsNullOrEmpty(viewModel.GrantedScopes) || 
+                string.IsNullOrEmpty(viewModel.RedirectUri))
+            {
+                return StatusCode(400, "Invalid request");
+            }
+
+            // fetch current user ID
+            var userId = (await _userManager.GetUserAsync(User)).Id;
+
+            return View(viewModel);
+        }
+
+        [HttpPost]
+        [Authorize]
+        [ValidateAntiForgeryToken]
+        public async Task<ActionResult> ConsentAllow(ConsentViewModel viewModel)
+        {
+            // fetch current user ID
+            var userId = (await _userManager.GetUserAsync(User)).Id;
+
+            // fetch existing grant (if any)
+            var existingGrant = await GetExistingGrant(viewModel.ClientId, userId);
+
+            // update grant record
+            await UpstertGrantRecord(existingGrant, viewModel.GrantedScopes, viewModel.ClientId, userId);
+
+            return await CreateAuthorizationCodeAndRedirect(viewModel.ClientId, userId, viewModel.RedirectUri, viewModel.State);
+        }
+
+        [HttpPost]
+        [Authorize]
+        [ValidateAntiForgeryToken]
+        public ActionResult ConsentDeny(ConsentViewModel viewModel)
+        {
+            return OAuth2AuthorizationError(
+                viewModel.RedirectUri, 
+                viewModel.State,
+                "access_denied", 
+                "The resource owner denied the request for authorization.");
+        }
+        
         [HttpPost]
         public async Task<ActionResult> Token(TokenModel model)
         {

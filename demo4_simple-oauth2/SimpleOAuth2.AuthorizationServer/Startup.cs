@@ -9,6 +9,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.AspNetCore.Mvc.ViewFeatures;
 using SimpleOAuth2.AuthorizationServer.Data;
 using SimpleOAuth2.AuthorizationServer.Models;
 using SimpleOAuth2.AuthorizationServer.Services;
@@ -56,6 +57,9 @@ namespace SimpleOAuth2.AuthorizationServer
             // OAuth2 configuration
             services.AddOptions();
             services.Configure<OAuth2Configuration>(Configuration.GetSection("OAuth2"));
+
+            // MVC TempData support
+            services.AddSingleton<ITempDataProvider, CookieTempDataProvider>();
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.

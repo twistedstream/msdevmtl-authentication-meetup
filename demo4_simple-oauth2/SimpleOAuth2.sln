@@ -5,6 +5,8 @@ VisualStudioVersion = 15.0.26124.0
 MinimumVisualStudioVersion = 15.0.26124.0
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SimpleOAuth2.ResourceServer", "SimpleOAuth2.ResourceServer\SimpleOAuth2.ResourceServer.csproj", "{732943B5-2C88-4861-A549-1DA5C661114C}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SimpleOAuth2.AuthorizationServer", "SimpleOAuth2.AuthorizationServer\SimpleOAuth2.AuthorizationServer.csproj", "{05FD53B0-2C69-465D-A67D-920E61FA6C79}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -30,5 +32,17 @@ Global
 		{732943B5-2C88-4861-A549-1DA5C661114C}.Release|x64.Build.0 = Release|x64
 		{732943B5-2C88-4861-A549-1DA5C661114C}.Release|x86.ActiveCfg = Release|x86
 		{732943B5-2C88-4861-A549-1DA5C661114C}.Release|x86.Build.0 = Release|x86
+		{05FD53B0-2C69-465D-A67D-920E61FA6C79}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{05FD53B0-2C69-465D-A67D-920E61FA6C79}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{05FD53B0-2C69-465D-A67D-920E61FA6C79}.Debug|x64.ActiveCfg = Debug|x64
+		{05FD53B0-2C69-465D-A67D-920E61FA6C79}.Debug|x64.Build.0 = Debug|x64
+		{05FD53B0-2C69-465D-A67D-920E61FA6C79}.Debug|x86.ActiveCfg = Debug|x86
+		{05FD53B0-2C69-465D-A67D-920E61FA6C79}.Debug|x86.Build.0 = Debug|x86
+		{05FD53B0-2C69-465D-A67D-920E61FA6C79}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{05FD53B0-2C69-465D-A67D-920E61FA6C79}.Release|Any CPU.Build.0 = Release|Any CPU
+		{05FD53B0-2C69-465D-A67D-920E61FA6C79}.Release|x64.ActiveCfg = Release|x64
+		{05FD53B0-2C69-465D-A67D-920E61FA6C79}.Release|x64.Build.0 = Release|x64
+		{05FD53B0-2C69-465D-A67D-920E61FA6C79}.Release|x86.ActiveCfg = Release|x86
+		{05FD53B0-2C69-465D-A67D-920E61FA6C79}.Release|x86.Build.0 = Release|x86
 	EndGlobalSection
 EndGlobal

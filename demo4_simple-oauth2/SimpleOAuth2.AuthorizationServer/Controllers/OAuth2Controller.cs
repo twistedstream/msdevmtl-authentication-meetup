@@ -1,13 +1,17 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.IdentityModel.Tokens.Jwt;
 using System.Threading.Tasks;
+using System.Security.Claims;
+using System.Text;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.Options;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.IdentityModel.Tokens;
 using SimpleOAuth2.AuthorizationServer.Data;
 using SimpleOAuth2.AuthorizationServer.Models;
 
@@ -26,6 +30,16 @@ namespace SimpleOAuth2.AuthorizationServer.Controllers
             _dbContext = dbContext;
             _oauth2Configuration = oauth2Configuration.Value;
             _oauth2Clients = _oauth2Configuration.Clients.ToDictionary(c => c.ClientId);
+        }
+
+        private JsonResult OAuth2TokenError(string error, string errorDescription)
+        {
+            Response.StatusCode = 400;
+            return Json(new
+            {
+                error,
+                error_description = errorDescription
+            });
         }
 
         [HttpGet]
@@ -125,6 +139,96 @@ namespace SimpleOAuth2.AuthorizationServer.Controllers
 
             var finalRedirectUrl = QueryHelpers.AddQueryString(redirectUri, queryParams);
             return Redirect(finalRedirectUrl);
+        }
+
+        [HttpPost]
+        public async Task<ActionResult> Token(TokenModel model)
+        {
+            // authenticate client credentials
+            if (!_oauth2Clients.ContainsKey(model.client_id)) {
+                return OAuth2TokenError("invalid_client", "Invalid client ID or secret.");
+            }
+            var client = _oauth2Clients[model.client_id];
+            if (model.client_secret != client.ClientSecret) {
+                return OAuth2TokenError("invalid_client", "Invalid client ID or secret.");
+            }
+
+            // validate grant_type
+            if (string.IsNullOrEmpty(model.grant_type))
+            {
+                return OAuth2TokenError("invalid_request", "Missing required parameter: grant_type");
+            }
+            if (model.grant_type != "authorization_code")
+            {
+                return OAuth2TokenError("unsupported_grant_type", "Unsupported grant type");
+            }
+
+            // validate code
+            if (string.IsNullOrEmpty(model.code))
+            {
+                return OAuth2TokenError("invalid_request", "Missing required parameter: code");
+            }
+
+            // validate redirect_uri
+            if (string.IsNullOrEmpty(model.redirect_uri))
+            {
+                return OAuth2TokenError("invalid_request", "Missing required parameter: redirect_uri");
+            }
+
+            // fetch and remove authorization code record (one time use)
+            var authorizationCode = await _dbContext.AuthorizationCodes
+                .SingleOrDefaultAsync(c => c.Code == model.code);
+            if (authorizationCode == null)
+            {
+                return OAuth2TokenError("invalid_request", "Invalid authorization code");
+            }
+            _dbContext.Remove(authorizationCode);
+            await _dbContext.SaveChangesAsync();
+
+            // validate authorization code record
+            if (model.redirect_uri != authorizationCode.RedirectUri)
+            {
+                return OAuth2TokenError("invalid_request", "Invalid redirect URI");
+            }
+            if (model.client_id != authorizationCode.ClientId)
+            {
+                return OAuth2TokenError("invalid_request", "Client ID does not match authorization code record");
+            }
+
+            // fetch grant record
+            var grant = await _dbContext.Grants
+                .SingleOrDefaultAsync(g => g.ClientId == authorizationCode.ClientId &&
+                                           g.UserId == authorizationCode.UserId);
+            if (grant == null)
+            {
+                return OAuth2TokenError("invalid_request", "Grant record associated with this authorization code no longer exists");
+            }
+            
+            // generate access token
+            var tokenDescriptor = new SecurityTokenDescriptor
+            {
+                Subject = new ClaimsIdentity(
+                    new Claim[] { 
+                        new Claim("sub", authorizationCode.UserId),
+                        new Claim("scope", grant.Scope)
+                    }),
+                Issuer = "https://oauth.example.com/",
+                Audience = "https://api.example.com/",
+                IssuedAt = DateTime.UtcNow,
+                Expires = DateTime.UtcNow.AddSeconds(3600),
+                SigningCredentials = new SigningCredentials(
+                    new SymmetricSecurityKey(Encoding.UTF8.GetBytes("this-is-my-super-secure-secret")), 
+                    SecurityAlgorithms.HmacSha256)
+            };
+            var tokenHandler = new JwtSecurityTokenHandler();
+            var accessToken = tokenHandler.CreateEncodedJwt(tokenDescriptor);
+
+            return Json(new 
+            {
+                access_token = accessToken,
+                token_type = "Bearer",
+                expires_in = 3600
+            });
         }
     }
 }
